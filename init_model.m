@@ -51,50 +51,53 @@ Ki = 100;    % Integral Gain (Eliminate steady-state drift)
 Kd = 400;    % Derivative Gain (Damping - prevents overshoot)
 
 disp('PID Controller Gains Loaded.');
-%% SECTION 4: Generate Road Profile (Speed Bump)
+%% SECTION 4: Generate Road Profile (Parabolic Bump)
 % Simulation settings
-T_end = 5; % Total simulation time (s)
-dt = 0.001; % Time step (s)
-time = 0:dt:T_end; % Time vector
+T_end = 5;              % Total simulation time (s)
+dt = 0.001;             % Time step (s)
+time = 0:dt:T_end;      % Time vector
 
 % Bump Parameters
-bump_height = 0.10; % 10 cm bump
-bump_length = 1.0; % 1 meter long bump
-car_speed_kmh = 30; % Car speed in km/h
+bump_height = 0.15;     % 15 cm bump
+bump_length = 5.0;      % 5 meter bump
+car_speed_kmh = 30;     % Car speed in km/h
 
 % Convert speed to m/s
 V = car_speed_kmh * (1000/3600);
 
 % Calculate transit time over the bump
 bump_duration = bump_length / V;
-start_time = 0.5; % Hit the bump at 0.5 seconds
+start_time = 1.0;       % Hit the bump at 1.0 seconds
 end_time = start_time + bump_duration;
 
 % Initialize vectors
-zr = zeros(size(time)); % Road Height (Meters) - For reference only
-zr_dot = zeros(size(time)); % Road Velocity (m/s) - ACTUAL INPUT
+zr = zeros(size(time));
+zr_dot = zeros(size(time));
 
-% Create the Haversine Bump
-% Formula: z = 0.5*H * (1 - cos(2*pi*x/L))
+% Constant factor for Parabola calculation (optimization)
+% K = 4 * H / L^2
+K_parabola = (4 * bump_height) / (bump_length^2);
+
+% Create the Parabolic Bump
 for i = 1:length(time)
     t = time(i);
     if t >= start_time && t <= end_time
         % Local time inside the bump
         t_local = t - start_time;
         
-        % Omega for the sine wave
-        omega = 2 * pi * V / bump_length;
+        % Distance traveled into the bump (x = V * t)
+        x_local = V * t_local;
         
-        % Road Height (Position)
-        zr(i) = 0.5 * bump_height * (1 - cos(omega * t_local));
+        % 1. Road Height (z_r): Geometric Parabola
+        % Formula: z = (4H/L^2) * x * (L - x)
+        zr(i) = K_parabola * x_local * (bump_length - x_local);
         
-        % Road Velocity (Derivative) -> Feeds into B Matrix!
-        zr_dot(i) = 0.5 * bump_height * omega * sin(omega * t_local);
+        % 2. Road Velocity (z_r_dot): Derivative with respect to time
+        % Formula: z_dot = V * (4H/L^2) * (L - 2x)
+        zr_dot(i) = V * K_parabola * (bump_length - 2 * x_local);
     end
 end
 
 % Create Timeseries Object for Simulink
-% We bundle Time and Data together so Simulink can read it easily
 road_input_data = timeseries(zr_dot', time);
-
-disp(['Road Profile Generated: Speed Bump at ' num2str(car_speed_kmh) ' km/h']);
+disp(['Road Profile Generated: Parabolic Bump (Length: ' num2str(bump_length) 'm)']);
