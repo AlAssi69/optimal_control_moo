@@ -3,83 +3,107 @@ clear;
 close all force;
 bdclose('all');
 
-init_model;
+% Run the initialization if needed
+try
+    init_model;
+catch
+    warning('init_model script not found. Using existing workspace variables.');
+end
 
 %% SECTION 5: Run Simulation & Extract Data
-% Define the model name (Change this to match your actual Simulink filename)
 model_name = 'pid_tuning_moo';
 
-% Run the simulation from the script
 disp('Running Simulation...');
 out = sim(model_name);
-
 disp('Simulation Complete. Plotting Results...');
 
-% Extract Data (Assumes you used "Log Selected Signals")
-% Modern Simulink stores logs in 'out.logsout'.
-% We access them by the name of the signal or the block it comes from.
-% NOTE: If these names don't match, check your signal names in Simulink!
-
 try
-    % Time vector
+    % --- 1. Extract Time ---
+    % Get simulation time vector from logs
     t_sim = out.logsout.get('Suspension Deflection').Values.Time;
     
-    % Signals
-    sus_def = out.logsout.get('Suspension Deflection').Values.Data;
+    % --- 2. Extract Logged Signals (Wi-Fi Icons) ---
+    sus_def    = out.logsout.get('Suspension Deflection').Values.Data;
     sprung_acc = out.logsout.get('Sprung Acceleration').Values.Data;
-    tire_def = out.logsout.get('Tire Deflection').Values.Data;
+    tire_def   = out.logsout.get('Tire Deflection').Values.Data;
     
-    % Try to get Force if logged, otherwise ignore
+    % Force (Output of Saturation Block)
     try
         ctrl_force = out.logsout.get('Force').Values.Data;
     catch
-        ctrl_force = zeros(size(t_sim)); % Placeholder if not logged
+        ctrl_force = zeros(size(t_sim));
+        warning('Force signal not found in logs.');
     end
     
-    % Input (Road Profile) - We can just use the workspace variable
-    % Resample 'zr_dot' to match simulation time if needed, or just plot the input array
+    % Road Velocity (Input Block)
+    try
+        road_vel_log = out.logsout.get('road_input_data').Values.Data;
+    catch
+        % Fallback to workspace variable if log is missing
+        road_vel_log = zr_dot;
+    end
     
 catch
-    error('Could not find signals! Make sure you right-clicked signal lines in Simulink and selected "Log Selected Signals".');
+    error('Could not find signals! Check signal names in Simulink and ensure "Log Selected Signals" is checked.');
 end
 
-%% SECTION 6: Generate Subplot Figure
-figure('Name', 'Quarter-Car Active Suspension Results', 'Color', 'w', 'Position', [100, 100, 1000, 800]);
+%% SECTION 6: Generate Subplot Figure (6 Plots)
+figure('Name', 'Quarter-Car Active Suspension Results', 'Color', 'w', 'Position', [100, 50, 1200, 900]);
 
-% --- Subplot 1: Road Input ---
-subplot(2, 2, 1);
-plot(time, zr, 'r--', 'LineWidth', 1.5); hold on;
-% Scale velocity to be visible or plot on right axis, but let's stick to Height
-ylabel('Road Height (m)');
-title('Road Profile Input');
+% --- Plot 1: Road Height (Visual Reference) ---
+subplot(3, 2, 1);
+plot(time, zr, 'r--', 'LineWidth', 1.5);
+ylabel('Height (m)');
+title('1. Road Profile Height (z_r)');
 grid on;
-legend('Road Height (z_r)');
 xlim([0, T_end]);
 
-% --- Subplot 2: Suspension Deflection ---
-subplot(2, 2, 2);
+% --- Plot 2: Road Velocity (Actual System Input) ---
+subplot(3, 2, 2);
+% SMART PLOT: Check if data length matches simulation time or workspace time
+if length(road_vel_log) == length(t_sim)
+    plot(t_sim, road_vel_log, 'r', 'LineWidth', 1.5);
+else
+    % Fallback: If lengths differ, it must be the workspace variable
+    plot(time, road_vel_log, 'r', 'LineWidth', 1.5);
+end
+ylabel('Velocity (m/s)');
+title('2. Road Velocity Input (z_r dot)');
+grid on;
+xlim([0, T_end]);
+
+% --- Plot 3: Suspension Deflection ---
+subplot(3, 2, 3);
 plot(t_sim, sus_def, 'k', 'LineWidth', 1.5);
 ylabel('Deflection (m)');
-title('Suspension Deflection (z_s - z_u)');
+title('3. Suspension Deflection (z_s - z_u)');
 grid on;
-yline(0, 'Color', [0.5 0.5 0.5], 'LineStyle', '--'); % Zero reference
+yline(0, 'Color', [0.5 0.5 0.5], 'LineStyle', '--');
 xlim([0, T_end]);
 
-% --- Subplot 3: Sprung Mass Acceleration (Comfort) ---
-subplot(2, 2, 3);
+% --- Plot 4: Tire Deflection ---
+subplot(3, 2, 4);
+plot(t_sim, tire_def, 'm', 'LineWidth', 1.5);
+ylabel('Deflection (m)');
+title('4. Tire Deflection (z_u - z_r)');
+grid on;
+xlim([0, T_end]);
+
+% --- Plot 5: Sprung Mass Acceleration (Comfort) ---
+subplot(3, 2, 5);
 plot(t_sim, sprung_acc, 'b', 'LineWidth', 1.5);
 ylabel('Acceleration (m/s^2)');
-title('Sprung Mass Acceleration (Comfort)');
+title('5. Sprung Mass Acceleration (Comfort)');
 grid on;
 xlim([0, T_end]);
 
-% --- Subplot 4: Control Force ---
-subplot(2, 2, 4);
+% --- Plot 6: Control Force ---
+subplot(3, 2, 6);
 plot(t_sim, ctrl_force, 'g', 'LineWidth', 1.5);
 ylabel('Force (N)');
-title('Active Control Force');
+title('6. Active Control Force');
 grid on;
 xlim([0, T_end]);
 
-% Add a main title to the whole figure
+% Add Main Title
 sgtitle(['Active Suspension Response at ' num2str(car_speed_kmh) ' km/h']);
