@@ -1,6 +1,8 @@
 % MAIN_WORKFLOW - Optimization of Quarter-Car Suspension
 clc; clear; close all;
 
+rng('default');
+
 % Add paths to libraries
 addpath(genpath('../lib'));
 addpath(genpath('../models'));
