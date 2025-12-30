@@ -28,7 +28,25 @@ function plot_simulation_results(results, conf, zr, time_vec)
     end
 
     % --- 2. Generate Figures ---
-    figure('Name', 'Quarter-Car Results', 'Color', 'w', 'Position', [100, 50, 1200, 900]);
+    % Create the figure with a white background
+    fig = figure('Name', 'Quarter-Car Results', 'Color', 'w', 'Position', [100, 50, 1200, 900]);
+
+    % --- LIGHT MODE OVERRIDE (BULLETPROOF) -------------------------------
+    % Force every element to be black/white to override Dark Mode theme
+    set(fig, 'DefaultAxesColor', 'w');       % White Plot Background
+    set(fig, 'DefaultAxesXColor', 'k');      % Black X Axis & Ticks
+    set(fig, 'DefaultAxesYColor', 'k');      % Black Y Axis & Ticks
+    set(fig, 'DefaultAxesZColor', 'k');      % Black Z Axis & Ticks
+    
+    % TEXT & TITLES
+    set(fig, 'DefaultTextColor', 'k');       % Black Text (Covers subplot titles)
+    set(fig, 'DefaultTextColor', 'k');       % Redundant check for some versions
+    set(fig, 'DefaultLegendTextColor', 'k'); % Black Legend Text
+    
+    % GRID
+    set(fig, 'DefaultAxesGridColor', [0.15 0.15 0.15]); % Dark Grey Grid
+    set(fig, 'DefaultAxesGridAlpha', 0.15);  % Subtle Grid
+    % ---------------------------------------------------------------------
 
     % Plot 1: Road Height (Visual Reference)
     subplot(3, 2, 1);
@@ -90,6 +108,7 @@ function plot_simulation_results(results, conf, zr, time_vec)
     grid on; 
     xlim([0, conf.T_end]);
 
-    % Main Title
-    sgtitle(['Simulation Results: ' conf.road_type ' bump at ' num2str(conf.car_speed_kmh) ' km/h']);
+    % Main Title (Explicitly Black)
+    % We pass 'Color', 'k' here just to be absolutely sure sgtitle doesn't default to gray
+    sgtitle(['Simulation Results: ' conf.road_type ' bump at ' num2str(conf.car_speed_kmh) ' km/h'], 'Color', 'k');
 end
