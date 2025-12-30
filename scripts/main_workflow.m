@@ -91,18 +91,51 @@ disp(['   Costs: ' num2str(special_points.comfort.costs)]);
 disp('3. Best Handling Solution (Min Deflection):');
 disp(['   Costs: ' num2str(special_points.handling.costs)]);
 
-%% 5. Verify & Plot the "Balanced" Solution
-disp('[5/6] Running Validation Simulation (Balanced)...');
-best_gains = special_points.balanced.gains;
-results = run_simulation(conf, mats, road_ts, best_gains(1), best_gains(2), best_gains(3));
+%% 5. Verify & Plot All Key Solutions
+disp('[5/6] Validating and Plotting Key Solutions...');
 
-disp('[6/6] Plotting Time-Domain Results...');
-plot_simulation_results(results, conf, zr, time_vec);
+% --- A. Balanced Solution ---
+disp('   > Simulating Balanced Solution...');
+gains = special_points.balanced.gains;
+results_bal = run_simulation(conf, mats, road_ts, gains(1), gains(2), gains(3));
+
+plot_simulation_results(results_bal, conf, zr, time_vec);
+% Update Title to distinguish this plot
+set(gcf, 'Name', 'Results: Balanced Solution');
+sgtitle(['Balanced Solution (Kp=' num2str(gains(1)) ')'], 'Color', 'k');
+
+
+% --- B. Best Comfort Solution ---
+disp('   > Simulating Best Comfort Solution...');
+gains = special_points.comfort.gains;
+results_comf = run_simulation(conf, mats, road_ts, gains(1), gains(2), gains(3));
+
+plot_simulation_results(results_comf, conf, zr, time_vec);
+set(gcf, 'Name', 'Results: Best Comfort');
+sgtitle(['Best Comfort Solution (Kp=' num2str(gains(1)) ')'], 'Color', 'k');
+
+
+% --- C. Best Handling Solution ---
+disp('   > Simulating Best Handling Solution...');
+gains = special_points.handling.gains;
+results_hand = run_simulation(conf, mats, road_ts, gains(1), gains(2), gains(3));
+
+plot_simulation_results(results_hand, conf, zr, time_vec);
+set(gcf, 'Name', 'Results: Best Handling');
+sgtitle(['Best Handling Solution (Kp=' num2str(gains(1)) ')'], 'Color', 'k');
 
 %% 6. Save Optimization Results
 save_path = fullfile('../res', 'optimization_results.mat');
-if ~exist('../res', 'dir'), mkdir('../res'); end
-save(save_path, 'REP', 'special_points', 'results', 'conf');
+
+% Ensure directory exists
+if ~exist('../res', 'dir')
+    mkdir('../res');
+end
+
+% Save all key data: Repository, Points, Config, and the 3 distinct simulation results
+save(save_path, 'REP', 'special_points', 'conf', ...
+    'results_bal', 'results_comf', 'results_hand');
+
 disp(['All results saved to: ' save_path]);
 
 %% 7. Plot Pareto Front (Trade-off Curve)
