@@ -31,7 +31,7 @@ params.maxvel = 5;       % Max velocity (%)
 params.u_mut = 0.5;      % Mutation rate
 
 % B. Problem Definition (Variables: Kp, Ki, Kd)
-MultiObj.nVar = 3; 
+MultiObj.nVar = 3;
 % Search Limits: [Kp, Ki, Kd]
 %                 Kp    Ki   Kd
 MultiObj.var_min = [1000, 0,   100];   % Lower Bounds
@@ -41,56 +41,70 @@ MultiObj.var_max = [50000, 500, 5000]; % Upper Bounds (Broad search space)
 disp('------------------------------------------------');
 disp('       STARTING MULTI-OBJECTIVE OPTIMIZATION    ');
 disp('------------------------------------------------');
-tic; % Start timer
+tic;
 
-% Run the MOPSO function
-% Note: This implicitly calls run_simulation() and calculate_objectives()
-REP = mopso_p(conf, params, MultiObj, mats, road_ts);
+% Run the MOPSO function (Parallel version recommended: mopso_p)
+try
+    REP = mopso_p(conf, params, MultiObj, mats, road_ts);
+catch
+    warning('mopso_p not found, using standard mopso.');
+    REP = mopso(conf, params, MultiObj, mats, road_ts);
+end
 
 elapsed_time = toc;
 disp(['Optimization finished in ' num2str(elapsed_time/60) ' minutes.']);
 
-%% 4. Select a "Balanced" Solution
-% The Repository (REP) contains many solutions. We need to pick one to visualize.
-% Strategy: Find the solution closest to the "Utopia Point" (0,0) (Normalized)
-
-% A. Normalize the objectives to 0-1 range to compare fairly
+%% 4. Select Key Solutions (Balanced, Comfort, Handling)
 costs = REP.pos_fit;
+
+% --- A. Balanced Solution (Closest to Utopia) ---
 min_c = min(costs); max_c = max(costs);
 norm_costs = (costs - min_c) ./ (max_c - min_c);
 
 % B. Calculate distance to origin (0,0)
 dist_to_zero = sqrt(sum(norm_costs.^2, 2));
+[~, idx_bal] = min(dist_to_zero);
 
-% C. Find index of minimum distance
-[~, idx_best] = min(dist_to_zero);
-best_gains = REP.pos(idx_best, :);
-best_costs = REP.pos_fit(idx_best, :);
+% --- B. Best Comfort (Min J1: ITAE Acceleration) ---
+[~, idx_comf] = min(costs(:, 1));
+
+% --- C. Best Handling (Min J2: ITAE Deflection) ---
+[~, idx_hand] = min(costs(:, 2));
+
+% --- Pack Data for Plotting ---
+special_points.balanced.gains = REP.pos(idx_bal, :);
+special_points.balanced.costs = REP.pos_fit(idx_bal, :);
+
+special_points.comfort.gains = REP.pos(idx_comf, :);
+special_points.comfort.costs = REP.pos_fit(idx_comf, :);
+
+special_points.handling.gains = REP.pos(idx_hand, :);
+special_points.handling.costs = REP.pos_fit(idx_hand, :);
 
 disp('------------------------------------------------');
-disp('             OPTIMAL SOLUTION SELECTED          ');
+disp('             KEY SOLUTIONS SELECTED             ');
 disp('------------------------------------------------');
-disp(['Kp: ' num2str(best_gains(1))]);
-disp(['Ki: ' num2str(best_gains(2))]);
-disp(['Kd: ' num2str(best_gains(3))]);
-disp(['Comfort Cost (ITAE Acc): ' num2str(best_costs(1))]);
-disp(['Handling Cost (ITAE Def): ' num2str(best_costs(2))]);
+disp('1. Balanced Solution:');
+disp(['   Costs: ' num2str(special_points.balanced.costs)]);
+disp('2. Best Comfort Solution (Min Accel):');
+disp(['   Costs: ' num2str(special_points.comfort.costs)]);
+disp('3. Best Handling Solution (Min Deflection):');
+disp(['   Costs: ' num2str(special_points.handling.costs)]);
 
-%% 5. Verify & Plot the Best Solution
-disp('[5/6] Running Validation Simulation...');
-
-% Run simulation with the Optimized Gains
+%% 5. Verify & Plot the "Balanced" Solution
+disp('[5/6] Running Validation Simulation (Balanced)...');
+best_gains = special_points.balanced.gains;
 results = run_simulation(conf, mats, road_ts, best_gains(1), best_gains(2), best_gains(3));
 
-% Plot using your reusable function
-disp('[6/6] Plotting Results...');
+disp('[6/6] Plotting Time-Domain Results...');
 plot_simulation_results(results, conf, zr, time_vec);
 
 %% 6. Save Optimization Results
 save_path = fullfile('../res', 'optimization_results.mat');
 if ~exist('../res', 'dir'), mkdir('../res'); end
-save(save_path, 'REP', 'best_gains', 'results', 'conf');
+save(save_path, 'REP', 'special_points', 'results', 'conf');
 disp(['All results saved to: ' save_path]);
 
 %% 7. Plot Pareto Front (Trade-off Curve)
-plot_pareto_front(REP, best_costs);
+% Pass the struct containing all three points
+plot_pareto_front(REP, special_points);
