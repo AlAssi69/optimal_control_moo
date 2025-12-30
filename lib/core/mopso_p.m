@@ -50,18 +50,18 @@ parfor i = 1:Np
     Kp = POS(i, 1);
     Ki = POS(i, 2);
     Kd = POS(i, 3);
-
+    
     try
         % A. Run Simulation
         % Each worker runs its own isolated simulation
         results = run_simulation(conf, mats, road_ts, Kp, Ki, Kd);
-
+        
         % B. Calculate Objectives
         [J1, J2] = calculate_objectives(results);
-
+        
         % Store Costs
         costs(i, :) = [J1, J2];
-
+        
     catch ME
         % Handle unstable particles
         warning('Particle %d unstable: %s', i, ME.message);
@@ -83,31 +83,31 @@ REP = updateGrid(REP, ngrid);
 fprintf('MOPSO: Starting Optimization Loop (%d Generations)\n', maxgen);
 
 for gen = 1:maxgen
-
+    
     % --- A. Leader Selection ---
     h = selectLeader(REP);
-
+    
     % --- B. Update Velocity & Position (Vectorized - Fast enough on single core) ---
     VEL = W .* VEL + ...
         C1 * rand(Np, nVar) .* (PBEST - POS) + ...
         C2 * rand(Np, nVar) .* (repmat(REP.pos(h, :), Np, 1) - POS);
-
+    
     POS = POS + VEL;
-
+    
     % --- C. Mutation ---
     POS = mutation(POS, gen, maxgen, Np, var_max, var_min, nVar, u_mut);
-
+    
     % --- D. Boundary Check ---
     [POS, VEL] = checkBoundaries(POS, VEL, MAX_VEL_LIMIT, var_max, var_min);
-
+    
     % --- E. Evaluate New Generation (PARALLEL) ---
     costs = zeros(Np, 2); % Reset costs buffer
-
+    
     parfor i = 1:Np
         Kp = POS(i, 1);
         Ki = POS(i, 2);
         Kd = POS(i, 3);
-
+        
         try
             results = run_simulation(conf, mats, road_ts, Kp, Ki, Kd);
             [J1, J2] = calculate_objectives(results);
@@ -117,18 +117,18 @@ for gen = 1:maxgen
         end
     end
     POS_fit = costs; % Update main fitness variable
-
+    
     % --- F. Update Repository ---
     REP = updateRepository(REP, POS, POS_fit, ngrid);
     if size(REP.pos, 1) > Nr
         REP = deleteFromRepository(REP, size(REP.pos, 1) - Nr, ngrid);
     end
-
+    
     % --- G. Update Personal Bests ---
     pos_best = dominates(POS_fit, PBEST_fit);
     best_pos = ~dominates(PBEST_fit, POS_fit);
     best_pos(rand(Np, 1) >= 0.5) = 0;
-
+    
     if sum(pos_best) > 0
         PBEST_fit(pos_best, :) = POS_fit(pos_best, :);
         PBEST(pos_best, :)     = POS(pos_best, :);
@@ -137,7 +137,7 @@ for gen = 1:maxgen
         PBEST_fit(best_pos, :) = POS_fit(best_pos, :);
         PBEST(best_pos, :)     = POS(best_pos, :);
     end
-
+    
     % Display Progress
     if mod(gen, 5) == 0 || gen == 1
         fprintf('Gen %d/%d | Rep Size: %d \n', gen, maxgen, size(REP.pos, 1));
