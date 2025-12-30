@@ -20,9 +20,9 @@ disp('[3/6] Generating Road Profile...');
 disp('[4/6] Configuring MOPSO Parameters...');
 
 % A. Solver Parameters
-params.Np = 5;          % Population Size (Higher = better search, slower)
+params.Np = 50;          % Population Size (Higher = better search, slower)
 params.Nr = 100;         % Repository/Archive Size
-params.maxgen = 5;      % Generations (Increase to 50+ for real results)
+params.maxgen = 50;      % Generations (Increase to 50+ for real results)
 params.W = 0.4;          % Inertia
 params.C1 = 2.0;         % Cognitive
 params.C2 = 2.0;         % Social
